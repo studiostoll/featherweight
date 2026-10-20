@@ -4,6 +4,13 @@
 
 A Figma plugin that exports frames as **light PDFs with real embedded fonts**.
 
+> **About this fork.** This is Studio Stoll's fork of
+> [coffeequickly/featherweight](https://github.com/coffeequickly/featherweight).
+> Branch `studio` carries fixes that are not upstream yet; `main` mirrors upstream.
+> Currently on `studio`: `freezeFrame` also freezes `FILL`-sized frames, so
+> redrawn text stays in place inside auto-layout tables and cards. To use the
+> plugin, install the original from the Figma Community (link below).
+
 Figma's built-in PDF export turns every letter into vector outlines. Your text
 can't be selected, searched, or read by résumé scanners (ATS) — and text-heavy
 documents balloon to 10–20MB that no compressor can shrink, because there are no
