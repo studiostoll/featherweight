@@ -320,9 +320,12 @@ export function freezeLayout(parent: BaseNode | null): void {
 function freezeFrame(frame: FrameNode): void {
   if (frame.layoutMode === 'NONE') return
 
+  // FILL 도 굳힌다. FILL 프레임은 레이아웃을 끄면 콘텐츠 높이를 잃고, 그걸 감싼 HUG 부모가 줄어든다.
+  // 실측: 표의 셀(세로 FILL)이 HUG 행 안에서 88→65pt 로 줄고 아래 행이 23pt 올라왔다 —
+  // 다시 그린 글자는 원래 자리에 있어서 표 안에서 아래로 밀려 보였다.
   try {
-    if (frame.layoutSizingHorizontal === 'HUG') frame.layoutSizingHorizontal = 'FIXED'
-    if (frame.layoutSizingVertical === 'HUG') frame.layoutSizingVertical = 'FIXED'
+    if (frame.layoutSizingHorizontal !== 'FIXED') frame.layoutSizingHorizontal = 'FIXED'
+    if (frame.layoutSizingVertical !== 'FIXED') frame.layoutSizingVertical = 'FIXED'
   } catch {
     // 오토레이아웃 자식이 아니면 이 속성을 못 쓴다 — 크기는 어차피 안 변한다
   }
