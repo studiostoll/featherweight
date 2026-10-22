@@ -299,6 +299,62 @@ export function detachInstances(root: SceneNode): SceneNode {
 }
 
 /**
+ * 떼어 내면서 바뀐 텍스트 박스를 원본대로 되돌린다.
+ *
+ * Figma 는 detach 할 때 인스턴스에서 덮어쓴 텍스트 크기 설정을 잃고 메인 컴포넌트 값으로 돌아간다.
+ * 실측: 가로 오토레이아웃·가운데 정렬 컴포넌트에서 인스턴스는 WIDTH_AND_HEIGHT·높이
+ * 14 인데 떼어 내자 NONE·FILL·높이 23·위 정렬이 되어 글자가 4.5pt 올라갔다 — 테두리는 그대로라
+ * PDF 에서 글자만 어긋나 보였다. textAutoResize 만 되돌리면 FILL 이 이겨서 안 되고, 부모를 굳힌 뒤
+ * 크기와 자리를 원본 좌표로 다시 놓아야 맞는다. 클론에서만 부르므로 원본 문서는 그대로다.
+ *
+ * clone() 과 detach 는 자식 순서를 보존하므로 collectTextNodes 순서로 짝을 맞춘다.
+ * 폰트를 못 불러오면(설치 안 된 폰트) 그 텍스트는 건드리지 않는다.
+ */
+export async function restoreDetachedText(clone: SceneNode, original: SceneNode): Promise<void> {
+  const cloneTexts = collectTextNodes(clone)
+  const originalTexts = collectTextNodes(original)
+  if (cloneTexts.length !== originalTexts.length) return
+  const cloneRoot = clone.absoluteBoundingBox
+  const originalRoot = original.absoluteBoundingBox
+  if (cloneRoot === null || originalRoot === null) return
+
+  for (const [index, text] of cloneTexts.entries()) {
+    const source = originalTexts[index]
+    const want = source.absoluteBoundingBox
+    const have = text.absoluteBoundingBox
+    if (want === null || have === null) continue
+    const target = { x: want.x - originalRoot.x, y: want.y - originalRoot.y }
+    const moved =
+      Math.abs(have.x - cloneRoot.x - target.x) > 0.01 ||
+      Math.abs(have.y - cloneRoot.y - target.y) > 0.01 ||
+      Math.abs(have.width - want.width) > 0.01 ||
+      Math.abs(have.height - want.height) > 0.01
+    if (!moved) continue
+
+    try {
+      await Promise.all(
+        text
+          .getRangeAllFontNames(0, text.characters.length)
+          .map((font) => figma.loadFontAsync(font))
+      )
+    } catch {
+      continue
+    }
+    freezeLayout(text.parent)
+    text.textAutoResize = source.textAutoResize
+    if (source.textAutoResize === 'NONE' || source.textAutoResize === 'TRUNCATE') {
+      text.resize(source.width, source.height)
+    } else if (source.textAutoResize === 'HEIGHT') {
+      text.resize(source.width, text.height)
+    }
+    const now = text.absoluteBoundingBox
+    if (now === null) continue
+    text.x += cloneRoot.x + target.x - now.x
+    text.y += cloneRoot.y + target.y - now.y
+  }
+}
+
+/**
  * 텍스트를 숨겨도 형제가 움직이지 않게 — 가장 가까운 오토레이아웃 조상을 굳힌다.
  *
  * 직계 부모만 보면 안 된다. 텍스트가 **그룹** 안에 있으면 그룹은 자식 크기를 따라가므로
